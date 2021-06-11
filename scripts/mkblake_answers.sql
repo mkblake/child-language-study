@@ -155,5 +155,22 @@ the smell of a pie attacking someone sounds cute*/
  > And his Complexion, dun!
 a. Examine the poets in the database with the name emily. Create a report showing the count of emilys by grade along with the 
 distribution of emotions that characterize their work.
-b. Export this report to Excel and create a visualization that shows what you have found.*/
+--b. Export this report to Excel and create a visualization that shows what you have found.*/
+
+--The query below shows the count of Emilys by grade
+SELECT COUNT(*) AS count_of_emilys, grade_id
+FROM author
+WHERE name ILIKE 'emily'
+GROUP BY grade_id;
+--The query below shows the distribution of emotions that characterize the work of the Emilys.
+SELECT author.id AS author_id, author.name, author.grade_id, poem.id AS poemid, emotion.name
+FROM author
+LEFT JOIN poem
+ON author.id = poem.author_id
+LEFT JOIN poem_emotion
+ON poem.id = poem_emotion.poem_id
+LEFT JOIN emotion
+ON poem_emotion.emotion_id = emotion.id
+WHERE author.name ILIKE 'emily'
+ORDER BY author.id, poemid;
 
