@@ -23,37 +23,39 @@ Which of these things do children write about more often?  Which do they have th
 Return the total number of poems, their average character count for poems that mention 'death' and poems that mention 'love'. 
 Do this in a single query.*/
 --2.Answer Kids write about love more often. But they have more to say about death. 
-SELECT 'death' as theme, COUNT(id), (AVG(char_count))
+SELECT 'death' as theme, COUNT(id) AS count_of_poems, ROUND((AVG(char_count)),2) AS avg_char_count
 FROM poem
 WHERE text ILIKE '%death%'
 OR title ILIKE '%death%'
 UNION
-SELECT 'love' as theme, COUNT(id), (AVG(char_count))
+SELECT 'love' as theme, COUNT(id) AS count_of_poems, ROUND((AVG(char_count)),2) AS avg_char_count
 FROM poem
 WHERE text ILIKE '%love%'
 OR title ILIKE '%love%';
-
 
 /*3. Do longer poems have more emotional intensity compared to shorter poems?
 a. Start by writing a query to return each emotion in the database with its average intensity and character count.
 	Which emotion is associated the longest poems on average?
 	Which emotion has the shortest?
-b. Convert the query you wrote in part 'a' into a CTE. Then find the 5 most intense poems that express joy and whether 
-they are to be longer or shorter than the average joy poem.
+b. Convert the query you wrote in part 'a' into a CTE. Then find the 5 most intense poems that 
+express joy and whether they are to be longer or shorter than the average joy poem.
 	3b. part 2. What is the most joyful poem about?
 	3b. part 3. Do you think these are all classified correctly?*/
 --3a. Anger is longest. Joy is shortest.	
-SELECT emotion.name, AVG(poem_emotion.intensity_percent) AS avg_intensity_perc, AVG(poem.char_count) AS avg_char_count
-FROM poem_emotion
-LEFT JOIN emotion
-ON poem_emotion.emotion_id = emotion.id
-LEFT JOIN poem
-ON poem_emotion.poem_id = poem.id
+SELECT emotion.name, 
+	ROUND(AVG(poem_emotion.intensity_percent),2) AS avg_intensity_perc, 
+	ROUND(AVG(poem.char_count),2) AS avg_char_count
+
+FROM poem_emotion LEFT JOIN emotion ON poem_emotion.emotion_id = emotion.id
+				  LEFT JOIN poem ON poem_emotion.poem_id = poem.id
+
 GROUP BY emotion.name
 ORDER BY avg_char_count DESC;
 --3b. The top 5 most intense Joy poems tend to be shorter than the average Joy poem.
 WITH emotion_intensity_length AS
-					(SELECT poem_emotion.emotion_id, emotion.name, AVG(poem_emotion.intensity_percent) AS avg_intensity_perc, AVG(poem.char_count) AS avg_char_count
+					(SELECT poem_emotion.emotion_id, emotion.name, 
+					 AVG(poem_emotion.intensity_percent) AS avg_intensity_perc, 
+					 ROUND(AVG(poem.char_count),2) AS avg_char_count
 					FROM poem_emotion
 					LEFT JOIN emotion
 					ON poem_emotion.emotion_id = emotion.id
@@ -61,17 +63,20 @@ WITH emotion_intensity_length AS
 					ON poem_emotion.poem_id = poem.id
 					GROUP BY emotion.name, poem_emotion.emotion_id
 					ORDER BY avg_char_count DESC)
-SELECT poem_emotion.poem_id, poem_emotion.intensity_percent, emotion.name, poem.char_count, eil.avg_char_count 
-	FROM poem_emotion
-	LEFT JOIN emotion
-	ON poem_emotion.emotion_id = emotion.id
-	LEFT JOIN poem
-	ON poem_emotion.poem_id = poem.id
-	LEFT JOIN emotion_intensity_length AS eil
-	ON poem_emotion.emotion_id = eil.emotion_id
-	WHERE emotion.name = 'Joy' 
-	ORDER BY poem_emotion.intensity_percent DESC, poem.char_count DESC
-	LIMIT 5;
+SELECT poem_emotion.poem_id, 
+		poem_emotion.intensity_percent, 
+		emotion.name, 
+		poem.char_count, 
+		eil.avg_char_count, 
+	CASE WHEN poem.char_count > avg_char_count THEN 'Longer'
+	ELSE 'Not Longer' END AS compare_to_avg
+FROM poem_emotion
+	LEFT JOIN emotion	ON poem_emotion.emotion_id = emotion.id
+	LEFT JOIN poem	ON poem_emotion.poem_id = poem.id
+	LEFT JOIN emotion_intensity_length AS eil	ON poem_emotion.emotion_id = eil.emotion_id
+	 WHERE emotion.name = 'Joy' 
+	 ORDER BY poem_emotion.intensity_percent DESC, poem.char_count DESC
+	 LIMIT 6;
 
 --3b. part 2. What is the most joyful poem about? The most joyful poem is about the author's dog. It seems the dog's name is Dagwood.
 SELECT title, text
@@ -105,24 +110,26 @@ FROM top_5_joyful
 LEFT JOIN poem
 ON top_5_joyful.poem_id = poem.id; 
 	
---4. Compare the 5 most angry poems by 1st graders to the 5 most angry poems by 5th graders.
+/*4. Compare the 5 most angry poems by 1st graders to the 5 most angry poems by 
+5th graders.*/
 WITH firstgrade AS
-			(SELECT poem_emotion.poem_id, poem.author_id, author.grade_id, poem_emotion.intensity_percent, emotion.name, gender.name, poem.title, poem.text  
-			FROM poem_emotion
-			LEFT JOIN emotion
-			ON poem_emotion.emotion_id = emotion.id
-			LEFT JOIN poem
-			ON poem_emotion.poem_id = poem.id
-			LEFT JOIN author
-			ON poem.author_id = author.id
-			LEFT JOIN gender
-			 ON author.gender_id = gender.id
+			(SELECT poem_emotion.poem_id, 
+			 		poem.author_id, 
+			 		author.grade_id, 
+			 		poem_emotion.intensity_percent, 
+			 		emotion.name AS emotion, gender.name AS gender_name, poem.title, poem.text  
+			FROM poem_emotion LEFT JOIN emotion	ON poem_emotion.emotion_id = emotion.id
+							LEFT JOIN poem ON poem_emotion.poem_id = poem.id
+							LEFT JOIN author ON poem.author_id = author.id
+							LEFT JOIN gender ON author.gender_id = gender.id
 			WHERE emotion.name = 'Anger' 
 			AND author.grade_id = 1
 			ORDER BY poem_emotion.intensity_percent DESC
 			LIMIT 5),
 fifthgrade AS 
-			(SELECT poem_emotion.poem_id, poem.author_id, author.grade_id, poem_emotion.intensity_percent, emotion.name, gender.name, poem.title, poem.text  
+			(SELECT poem_emotion.poem_id, poem.author_id, author.grade_id, 
+			 poem_emotion.intensity_percent, emotion.name AS emotion, gender.name AS gender_name,
+			 poem.title, poem.text  
 			FROM poem_emotion
 			LEFT JOIN emotion
 			ON poem_emotion.emotion_id = emotion.id
@@ -143,7 +150,7 @@ SELECT *
 FROM fifthgrade
 ORDER BY intensity_percent DESC;
 /* 4
-a. Which group writes the angreist poems according to the intensity score? Fifth graders.
+a. Which group writes the angriest poems according to the intensity score? Fifth graders.
 b. Who shows up more in the top five for grades 1 and 5, males or females? Female! 
 c. Which of these do you like the best? Poem 566, Pie, written by a first grade female. Because I think
 the smell of a pie attacking someone sounds cute*/
@@ -163,14 +170,32 @@ FROM author
 WHERE name ILIKE 'emily'
 GROUP BY grade_id;
 --The query below shows the distribution of emotions that characterize the work of the Emilys.
-SELECT author.id AS author_id, author.name, author.grade_id, poem.id AS poemid, emotion.name
+SELECT 
+	author.id AS author_id, 
+	author.name, 
+	author.grade_id, 
+	poem.id AS poemid, 
+	emotion.name AS emotion
 FROM author
-LEFT JOIN poem
-ON author.id = poem.author_id
-LEFT JOIN poem_emotion
-ON poem.id = poem_emotion.poem_id
-LEFT JOIN emotion
-ON poem_emotion.emotion_id = emotion.id
+	LEFT JOIN poem ON author.id = poem.author_id
+	LEFT JOIN poem_emotion ON poem.id = poem_emotion.poem_id
+	LEFT JOIN emotion ON poem_emotion.emotion_id = emotion.id
 WHERE author.name ILIKE 'emily'
-ORDER BY author.id, poemid;
-
+ORDER BY author.id, poemid, emotion;
+--The query below offers an alternative way to visualize the distribution of emotions.
+SELECT 
+	emotion.name AS emotion,
+	COUNT
+		(CASE WHEN emotion.name = 'Joy' THEN 'Joy' 
+		 WHEN emotion.name = 'Anger' THEN 'Anger' 
+		 WHEN emotion.name = 'Fear' THEN 'Fear'
+		 WHEN emotion.name = 'Sadness' THEN 'Sadness'
+		 END) AS emotion_distribution
+FROM author
+	LEFT JOIN poem ON author.id = poem.author_id
+	LEFT JOIN poem_emotion ON poem.id = poem_emotion.poem_id
+	LEFT JOIN emotion ON poem_emotion.emotion_id = emotion.id
+WHERE author.name ILIKE 'emily'
+AND emotion IS NOT NULL
+GROUP BY emotion
+ORDER BY emotion;
